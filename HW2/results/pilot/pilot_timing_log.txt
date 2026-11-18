@@ -1,0 +1,54 @@
+每 0.5 s 區塊的跨種子平均吞吐量 (Mbps) / 平均延遲 (ms)，由 t=0 (空佇列) 開始：
+  mid/light/light legacy tput:   5.2   4.9   4.9   5.0   4.9   4.8   5.2   4.9   5.0   5.2   4.9   5.1 ... | 後半平均 5.04
+                     delay:     1     1     1     1     1     1     1     1     1     1     1     1 ... | 後半平均 0.9
+                     throughput: 自 t=0.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=17.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+  mid/light/light fixed  tput:   5.2   4.9   4.9   5.0   4.9   4.8   5.2   4.9   5.0   5.2   4.9   5.1 ... | 後半平均 5.04
+                     delay:     1     1     1     1     1     1     1     1     1     1     1     1 ... | 後半平均 0.7
+                     throughput: 自 t=0.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=13.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+  high/heavy/heavy legacy tput:  18.1  16.7  19.7  17.4  18.2  17.5  17.6  18.3  18.8  18.4  17.6  18.9 ... | 後半平均 18.75
+                     delay:    91   287   307   324   311   338   324   328   307   307   323   306 ... | 後半平均 308.4
+                     throughput: 自 t=10.5 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=0.5 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+  high/heavy/heavy fixed  tput:  22.3  21.7  23.5  24.6  22.2  21.9  23.3  22.4  22.5  21.4  21.8  23.0 ... | 後半平均 22.43
+                     delay:    57   176   227   211   236   264   240   243   245   253   265   243 ... | 後半平均 247.7
+                     throughput: 自 t=0.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=2.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+  mid/heavy/light legacy tput:   5.2   4.9   4.9   5.0   4.9   4.8   5.2   4.9   5.0   5.2   4.9   5.1 ... | 後半平均 5.04
+                     delay:     1     1     1     1     1     1     1     1     1     1     1     1 ... | 後半平均 0.9
+                     throughput: 自 t=0.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=17.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+  mid/heavy/light fixed  tput:   5.2   4.9   4.9   5.0   4.9   4.8   5.2   4.9   5.0   5.2   4.9   5.1 ... | 後半平均 5.04
+                     delay:     1     1     1     1     1     1     1     1     1     1     1     1 ... | 後半平均 0.7
+                     throughput: 自 t=0.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=19.5 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+  high/light/heavy legacy tput:  18.1  16.7  19.7  17.4  18.2  17.5  17.6  18.3  18.8  18.4  17.6  18.9 ... | 後半平均 18.75
+                     delay:    91   287   307   324   311   338   324   328   307   307   323   306 ... | 後半平均 308.4
+                     throughput: 自 t=10.5 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=0.5 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+  high/light/heavy fixed  tput:  25.1  25.6  25.3  26.0  25.2  25.6  25.4  25.4  25.2  25.0  25.1  25.3 ... | 後半平均 25.09
+                     delay:    37   108   159   178   182   200   196   205   197   194   199   207 ... | 後半平均 206.1
+                     throughput: 自 t=0.0 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+                     delay: 自 t=2.5 s 起各 0.5 s 區塊均落在後半平均 ±10% 內
+
+量測長度對信賴區間的影響 (暖機 2 s；20 個試跑種子；Legacy)：
+  100/320
+  200/320
+  300/320
+  mid/light/light T_meas=   2s  tput   4.99 ± 0.09 ( 1.9%)   delay     0.9 ±   0.0 ( 4.2%)
+  mid/light/light T_meas=   5s  tput   5.00 ± 0.06 ( 1.2%)   delay     0.8 ±   0.0 ( 2.9%)
+  mid/light/light T_meas=  10s  tput   4.99 ± 0.05 ( 1.0%)   delay     0.9 ±   0.0 ( 2.3%)
+  mid/light/light T_meas=  20s  tput   4.98 ± 0.03 ( 0.6%)   delay     0.9 ±   0.0 ( 1.7%)
+  high/heavy/heavy T_meas=   2s  tput  18.81 ± 0.38 ( 2.0%)   delay   304.3 ±   7.0 ( 2.3%)
+  high/heavy/heavy T_meas=   5s  tput  18.74 ± 0.22 ( 1.2%)   delay   306.9 ±   4.1 ( 1.3%)
+  high/heavy/heavy T_meas=  10s  tput  18.90 ± 0.29 ( 1.5%)   delay   303.4 ±   5.6 ( 1.8%)
+  high/heavy/heavy T_meas=  20s  tput  18.76 ± 0.19 ( 1.0%)   delay   305.9 ±   3.6 ( 1.2%)
+  mid/heavy/light T_meas=   2s  tput   4.99 ± 0.09 ( 1.9%)   delay     0.9 ±   0.0 ( 4.2%)
+  mid/heavy/light T_meas=   5s  tput   5.00 ± 0.06 ( 1.2%)   delay     0.8 ±   0.0 ( 2.9%)
+  mid/heavy/light T_meas=  10s  tput   4.99 ± 0.05 ( 1.0%)   delay     0.9 ±   0.0 ( 2.3%)
+  mid/heavy/light T_meas=  20s  tput   4.98 ± 0.03 ( 0.6%)   delay     0.9 ±   0.0 ( 1.7%)
+  high/light/heavy T_meas=   2s  tput  18.81 ± 0.38 ( 2.0%)   delay   304.3 ±   7.0 ( 2.3%)
+  high/light/heavy T_meas=   5s  tput  18.74 ± 0.22 ( 1.2%)   delay   306.9 ±   4.1 ( 1.3%)
+  high/light/heavy T_meas=  10s  tput  18.90 ± 0.29 ( 1.5%)   delay   303.4 ±   5.6 ( 1.8%)
+  high/light/heavy T_meas=  20s  tput  18.76 ± 0.19 ( 1.0%)   delay   305.9 ±   3.6 ( 1.2%)

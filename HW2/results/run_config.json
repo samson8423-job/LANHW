@@ -1,0 +1,89 @@
+{
+  "t_warm_s": 3.0,
+  "t_meas_s": 10.0,
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "n_sta": 5,
+  "base_theta_us": 500,
+  "k_us": 2000,
+  "sens_thetas_us": [
+    0,
+    200,
+    500,
+    1000,
+    2000
+  ],
+  "sens_ks_us": [
+    1000,
+    4000
+  ],
+  "chosen_loads": {
+    "rate_p_pps": {
+      "low": 100.1,
+      "mid": 252.5,
+      "high": 398.4
+    },
+    "rate_s_pps": {
+      "light": 148.8,
+      "heavy": 587.1
+    },
+    "target_mbps": {
+      "light": 5.0,
+      "heavy": 30.0
+    },
+    "pilot_seeds": [
+      1001,
+      1002,
+      1003,
+      1004,
+      1005
+    ],
+    "pilot_t_warm_s": 1.0,
+    "pilot_t_meas_s": 4.0,
+    "verified": {
+      "P_low_Tlight": 0.109,
+      "P_low_Theavy": 0.1545,
+      "P_mid_Tlight": 0.2569,
+      "P_mid_Theavy": 0.3547,
+      "P_high_Tlight": 0.4074,
+      "P_high_Theavy": 0.4358,
+      "S_light": 0.1533,
+      "S_heavy": 0.6086
+    }
+  },
+  "python": "3.11.4",
+  "numpy": "2.4.6",
+  "platform": "Windows-10-10.0.18363-SP0",
+  "matplotlib": "3.11.2",
+  "main_elapsed_s": 105.6
+}

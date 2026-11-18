@@ -1,0 +1,34 @@
+{
+  "rate_p_pps": {
+    "low": 100.1,
+    "mid": 252.5,
+    "high": 398.4
+  },
+  "rate_s_pps": {
+    "light": 148.8,
+    "heavy": 587.1
+  },
+  "target_mbps": {
+    "light": 5.0,
+    "heavy": 30.0
+  },
+  "pilot_seeds": [
+    1001,
+    1002,
+    1003,
+    1004,
+    1005
+  ],
+  "pilot_t_warm_s": 1.0,
+  "pilot_t_meas_s": 4.0,
+  "verified": {
+    "P_low_Tlight": 0.109,
+    "P_low_Theavy": 0.1545,
+    "P_mid_Tlight": 0.2569,
+    "P_mid_Theavy": 0.3547,
+    "P_high_Tlight": 0.4074,
+    "P_high_Theavy": 0.4358,
+    "S_light": 0.1533,
+    "S_heavy": 0.6086
+  }
+}
