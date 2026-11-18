@@ -3,6 +3,8 @@
   .\.venv\Scripts\python.exe run_experiment.py main   # 12 情境 x 3 方法 x 30 種子 -> results/raw_per_seed.csv
   .\.venv\Scripts\python.exe run_experiment.py sens   # 基礎門檻 / 係數敏感度 -> results/raw_sensitivity.csv
   .\.venv\Scripts\python.exe run_experiment.py events # 事件紀錄小片段 -> results/event_log_sample.csv
+  .\.venv\Scripts\python.exe run_experiment.py improve # 改善變體 (佇列感知 / 視窗長度 / oracle 診斷) -> results/raw_improve.csv
+  .\.venv\Scripts\python.exe run_experiment.py rate     # 目標負載延伸 10/15/20/25 Mbps -> results/raw_rate.csv
 
 暖機/量測長度與種子數依 pilot.py timing 的結果決定 (見 README)。
 """
@@ -18,7 +20,7 @@ import numpy as np
 
 from npca_sim.config import US
 from npca_sim.experiment import N_STA, run_many
-from npca_sim.scenarios import TARGET_MBPS, all_scenarios, load_chosen, scenario_id
+from npca_sim.scenarios import P_LEVELS, S_LEVELS, TARGET_MBPS, all_scenarios, load_chosen, scenario_id
 
 T_WARM_S = 3.0
 T_MEAS_S = 10.0
@@ -121,6 +123,62 @@ def cmd_sens():
     print(f"完成，耗時 {time.time() - t0:.0f} s -> results/raw_sensitivity.csv")
 
 
+IMPROVE_DEFAULTS = dict(theta0_us=500, k_us=2000, theta_hi_us=500, qa_min_backlog=20, busy_window_ms=20)
+IMPROVE_SPECS = [
+    dict(variant="legacy", method="legacy"),
+    dict(variant="fixed_th0", method="fixed", theta0_us=0),
+    dict(variant="fixed_th500", method="fixed"),
+    dict(variant="adaptive_th500_k2000_w20", method="adaptive"),
+    dict(variant="adaptive_th500_k2000_w5", method="adaptive", busy_window_ms=5),
+    dict(variant="adaptive_th500_k2000_w2", method="adaptive", busy_window_ms=2),
+    dict(variant="queue_lo0_hi500_B20", method="queue", theta0_us=0),
+    dict(variant="oracle_th0", method="oracle", theta0_us=0),
+]
+RATE_MBPS = [10, 15, 20, 25]
+RATE_SPECS = [
+    dict(variant="legacy", method="legacy"),
+    dict(variant="fixed_th500", method="fixed"),
+    dict(variant="adaptive_th500_k2000", method="adaptive"),
+]
+
+
+def make_jobs_spec(specs, scen):
+    """specs: 變體參數 dict 列表；scen: [(p, s, t_level, target_mbps)]。未指定的參數用 IMPROVE_DEFAULTS。"""
+    ch = load_chosen()
+    jobs = []
+    for p, s, tl, mbps in scen:
+        for sp in specs:
+            cfg = {**IMPROVE_DEFAULTS, **sp}
+            for seed in SEEDS:
+                jobs.append(dict(
+                    scenario=scenario_id(p, s, tl), p_level=p, s_level=s, t_level=tl, seed=seed,
+                    rate_p_pps=ch["rate_p_pps"][p], rate_s_pps=ch["rate_s_pps"][s], target_mbps=mbps,
+                    t_warm_s=T_WARM_S, t_meas_s=T_MEAS_S, **cfg,
+                ))
+    return jobs
+
+
+def cmd_improve():
+    jobs = make_jobs_spec(IMPROVE_SPECS, [(p, s, t, TARGET_MBPS[t]) for p, s, t in all_scenarios()])
+    print(f"改善實驗：{len(jobs)} 次模擬 ({len(IMPROVE_SPECS)} 變體 x 12 情境 x {len(SEEDS)} 種子)")
+    t0 = time.time()
+    rows = run_many(jobs)
+    rows.sort(key=lambda r: (r["scenario"], r["variant"], r["seed"]))
+    write_csv(os.path.join(OUT, "raw_improve.csv"), rows, META_COLS)
+    print(f"完成，耗時 {time.time() - t0:.0f} s -> results/raw_improve.csv")
+
+
+def cmd_rate():
+    scen = [(p, s, str(m), float(m)) for p in P_LEVELS for s in S_LEVELS for m in RATE_MBPS]
+    jobs = make_jobs_spec(RATE_SPECS, scen)
+    print(f"負載延伸實驗：{len(jobs)} 次模擬 ({len(RATE_MBPS)} 個負載 x 6 情境 x 3 方法 x {len(SEEDS)} 種子)")
+    t0 = time.time()
+    rows = run_many(jobs)
+    rows.sort(key=lambda r: (r["scenario"], r["variant"], r["seed"]))
+    write_csv(os.path.join(OUT, "raw_rate.csv"), rows, META_COLS)
+    print(f"完成，耗時 {time.time() - t0:.0f} s -> results/raw_rate.csv")
+
+
 def cmd_events():
     """輸出一小段事件紀錄 (自適應門檻、P_mid/S_heavy/T_heavy、seed 1)，涵蓋切換、退避凍結/續倒數、碰撞與返回。"""
     from npca_sim.sim import SimConfig, Simulator
@@ -151,7 +209,7 @@ def cmd_events():
 
 
 if __name__ == "__main__":
-    cmds = {"main": cmd_main, "sens": cmd_sens, "events": cmd_events}
+    cmds = {"main": cmd_main, "sens": cmd_sens, "events": cmd_events, "improve": cmd_improve, "rate": cmd_rate}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(__doc__)
         sys.exit(1)

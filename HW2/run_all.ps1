@@ -19,3 +19,6 @@ if ($LASTEXITCODE -ne 0) { throw "validate.py failed" }
 & $py run_experiment.py sens           # 5. threshold / coefficient sensitivity
 & $py run_experiment.py events         # 6. short event-log excerpt
 & $py analyze.py                       # 7. summary CSV, paired differences, PNG, tables.md
+& $py run_experiment.py improve        # 8. improvement variants (8 variants x 12 scenarios x 30 seeds)
+& $py run_experiment.py rate           # 9. rate extension 10/15/20/25 Mbps (4 loads x 6 scenarios x 3 methods x 30 seeds)
+& $py analyze_extra.py                 # 10. improvement tables, rate summary, change points, fig7

@@ -23,10 +23,13 @@ P_DONE, P_BEND, P_DEC = 0, 1, 2
 
 @dataclass
 class SimConfig:
-    method: str = "legacy"            # legacy | fixed | adaptive
-    theta0_ns: int = 500 * US         # 固定門檻 / 自適應基礎門檻
+    method: str = "legacy"            # legacy | fixed | adaptive | queue | oracle (診斷用)
+    theta0_ns: int = 500 * US         # 固定門檻 / 自適應基礎門檻 / queue 在積壓足夠時的門檻
     k_ns: float = 2000.0 * US         # 自適應係數：門檻 = theta0 + k * 副通道近期忙碌比例
     busy_window_ns: int = 20_000 * US  # 近期忙碌比例的回看視窗
+    theta_hi_ns: int = 500 * US       # queue：積壓不足時改用的門檻
+    qa_min_backlog: int = 20          # queue：目標 BSS 待傳封包總數 >= 此值時使用 theta0
+    oracle_s_busy: tuple = ()         # oracle 專用：副通道 OBSS 傳輸區間 (start, end)，取自前一趟模擬 (含未來資訊)
     t_warm_ns: int = 0
     t_meas_ns: int = 1_000_000_000
     n_sta: int = 5
@@ -119,6 +122,9 @@ class Simulator:
         self.tracing = cfg.trace
         self.blk = {}
         self.npca_k_ns = cfg.k_ns
+        self.oracle_iv = cfg.oracle_s_busy
+        self.oracle_en = [b for _, b in cfg.oracle_s_busy]
+        self.n_rej_oracle = self.n_sw_s_busy0 = self.n_rej_theta_s_idle = 0
 
     # ---------------------------------------------------------------- 工具
     def _trace(self, t, ev, node, ch, info=""):
@@ -161,6 +167,17 @@ class Simulator:
         if t <= a:
             return 0.0
         return self.obss_s.busy_in(a, t) / (t - a)
+
+    def _oracle_feasible(self, t, win_end, need):
+        """診斷用：依前一趟的副通道 OBSS 傳輸紀錄，判斷 [t+DIFS, win_end] 內是否有閒置段可容納 need (含未來資訊，非可實作方法)。"""
+        a = t + DIFS
+        for st, en in self.oracle_iv[bisect.bisect_right(self.oracle_en, t):]:
+            if a + need <= min(st, win_end):
+                return True
+            if st >= win_end:
+                return False
+            a = max(a, en + DIFS)
+        return a + need <= win_end
 
     # ---------------------------------------------------------------- 事件處理
     def _arrival(self, nd, t):
@@ -303,9 +320,13 @@ class Simulator:
         remaining = t_end_est - t
         backlog = any(nd.queue for nd in self.targets)
         ratio = None
-        if self.cfg.method == "adaptive":
+        m = self.cfg.method
+        if m == "adaptive":
             ratio = self._s_busy_ratio(t)
             theta = self.cfg.theta0_ns + self.npca_k_ns * ratio
+        elif m == "queue":
+            n_pkts = sum(len(nd.queue) for nd in self.targets)
+            theta = self.cfg.theta0_ns if n_pkts >= self.cfg.qa_min_backlog else self.cfg.theta_hi_ns
         else:
             theta = self.cfg.theta0_ns
         if not backlog:
@@ -316,11 +337,20 @@ class Simulator:
         if remaining <= theta:
             if win:
                 self.n_rej_theta += 1
+                self.n_rej_theta_s_idle += self.busy_until[1] <= t
             self.tracing and self._trace(t, "NPCA_REJECT", "TARGET", 0,
                         f"remaining_us={remaining / US:.1f} theta_us={theta / US:.1f} ratio={'-' if ratio is None else format(ratio, '.3f')}")
             return
+        if m == "oracle":
+            need = min(EXCH[nd.queue[0][1]] for nd in self.targets if nd.queue)
+            if not self._oracle_feasible(t, t_end_est - T_BACK, need):
+                if win:
+                    self.n_rej_oracle += 1
+                self.tracing and self._trace(t, "NPCA_REJECT", "TARGET", 0, "oracle: 副通道無可容納交換的閒置窗口")
+                return
         if win:
             self.theta_sum += theta
+            self.n_sw_s_busy0 += self.busy_until[1] > t
         self.session = {
             "t_start": t, "t_end": t_end_est, "win_end": t_end_est - T_BACK,
             "sense_ready": t + DIFS, "deliv": 0, "tx": 0, "coll": 0,
@@ -431,6 +461,9 @@ class Simulator:
             "n_eligible": self.n_eligible,
             "n_rej_theta": self.n_rej_theta,
             "n_rej_nobacklog": self.n_rej_nobacklog,
+            "n_rej_oracle": self.n_rej_oracle,
+            "n_rej_theta_s_idle": self.n_rej_theta_s_idle,
+            "n_sw_s_busy0": self.n_sw_s_busy0,
             "n_switch": n_sw,
             "n_switch_no_delivery": sw_nodeliv,
             "n_switch_no_tx": sw_notx,

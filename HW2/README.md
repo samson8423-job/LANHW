@@ -17,8 +17,9 @@
 | `npca_sim/scenarios.py` | 情境定義 |
 | `validate.py` | 驗證腳本（正式實驗前先跑） |
 | `pilot.py` | 試跑：決定 OBSS 低/中/高負載；確認暖機、量測長度、種子數 |
-| `run_experiment.py` | 正式實驗、敏感度實驗、事件紀錄片段 |
+| `run_experiment.py` | 正式實驗、敏感度實驗、事件紀錄片段、改善實驗（`improve`）、速率延伸（`rate`，10/15/20/25 Mbps） |
 | `analyze.py` | 彙總 CSV、成對差值、PNG 圖、`results/tables.md` |
+| `analyze_extra.py` | 改善實驗與速率延伸的彙總、變化點表、`fig7_rate_sweep.png` |
 | `run_all.ps1` | 依序執行以上全部步驟 |
 | `requirements.txt` | 相依套件（固定版本） |
 | `results/` | 全部輸出（見第 9 節） |
@@ -27,7 +28,7 @@
 
 ## 2. 環境與重現指令（Windows 10 / PowerShell 5.1）
 
-實測環境：Python **3.11.4**（`C:\Python311`）、`.venv`、NumPy **2.4.6**、Matplotlib **3.11.2**；其餘只用標準函式庫（`heapq`、`bisect`、`random`、`multiprocessing`、`csv`、`json`、`math`、`re`）。機器為 6 核心 CPU，正式流程約 15–20 分鐘（主實驗約 2 分鐘、敏感度約 7 分鐘）。
+實測環境：Python **3.11.4**（`C:\Python311`）、`.venv`、NumPy **2.4.6**、Matplotlib **3.11.2**；其餘只用標準函式庫（`heapq`、`bisect`、`random`、`multiprocessing`、`csv`、`json`、`math`、`re`）。機器為 6 核心 CPU，正式流程約 25–30 分鐘（主實驗約 2 分鐘、敏感度約 7 分鐘、改善實驗約 6 分鐘、速率延伸約 4 分鐘）。
 
 ```powershell
 cd C:\Users\user\Desktop\LANHW\HW2
@@ -47,6 +48,9 @@ powershell -ExecutionPolicy Bypass -File .\run_all.ps1
 .\.venv\Scripts\python.exe run_experiment.py sens     # 敏感度實驗
 .\.venv\Scripts\python.exe run_experiment.py events   # 事件紀錄片段
 .\.venv\Scripts\python.exe analyze.py                 # 彙總與繪圖
+.\.venv\Scripts\python.exe run_experiment.py improve   # 改善實驗 (8 變體 x 12 情境 x 30 種子)
+.\.venv\Scripts\python.exe run_experiment.py rate      # 速率延伸 (10/15/20/25 Mbps)
+.\.venv\Scripts\python.exe analyze_extra.py            # 改善與速率的彙總、變化點、fig7
 ```
 
 模擬完全由種子決定，重跑得到相同結果（我用單一程序重算 9 次模擬並與平行執行得到的 CSV 逐欄比對，0 個差異）；平行執行只影響完成順序，輸出前已排序。
@@ -296,6 +300,10 @@ powershell -ExecutionPolicy Bypass -File .\run_all.ps1
 - **延遲的解讀（重載）**：緩衝區有限（每 STA 100 封包），重載下佇列會迅速填滿而不是無限成長，所以平均延遲被「緩衝區大小 × 服務時間」封頂；平均延遲**只含成功送達的封包**，被丟棄的封包與期末仍在佇列的封包都不在其中。重載時這會讓延遲偏向較早完成/較幸運的封包（生存者偏差），因此重載下的延遲必須與丟棄率、期末未送達數、期末積壓平均年齡一起讀（7.2 表格已列出）。
 - **多重比較**：12 情境 × 多指標，標示 `*` 的 CI 未做多重比較校正；請以效果量（差值大小）為主、顯著性為輔。
 - **無效切換成本低**：在本模型中，切換發生時主通道本來就被 OBSS 占用，且 backoff 計數器完整保留，所以「切了但沒送出」不會額外損失主通道機會；這是下列觀察（自適應減少無效切換卻沒帶來好處）的合理解釋之一，但**這是我對模型機制的推論，未另做實驗隔離**。
+- **改善實驗的範圍**：原計畫的「副通道閒置時間預測」變體未實作，改為較單純的「回看視窗長度」掃描（20/5/2 ms）（見第 10 節）。
+- **oracle 是近似診斷，不是上界**：它用與主實驗同種子、θ0=0 的固定門檻前一趟紀錄，取得副通道 OBSS 傳輸區間。主實驗中目標 BSS 自己在副通道的傳輸會改變副通道 OBSS 的行為，因此兩次軌跡並不相同。
+- **速率延伸的負載未重新試跑**：OBSS 到達率沿用 5/30 Mbps 試跑校準的 P/S 設定；實測 OBSS_P 忙碌比例隨目標負載改變（見 11.4）。
+- **變化點解析度**：只掃 5 Mbps 間距的 6 個點；「變化點」是第一個符合條件的掃描點，不是精確的臨界值。0.95 的飽和門檻是本作業的選擇。
 
 ---
 
@@ -317,6 +325,9 @@ powershell -ExecutionPolicy Bypass -File .\run_all.ps1
 #     .\.venv\Scripts\python.exe run_experiment.py sens
 #     .\.venv\Scripts\python.exe run_experiment.py events
 #     .\.venv\Scripts\python.exe analyze.py
+#     .\.venv\Scripts\python.exe run_experiment.py improve   # 改善實驗（另行執行）
+#     .\.venv\Scripts\python.exe run_experiment.py rate      # 速率延伸（另行執行）
+#     .\.venv\Scripts\python.exe analyze_extra.py            # 改善與速率彙總（另行執行）
 ```
 
 ### 9.2 產出檔案（`results/`）
@@ -338,4 +349,157 @@ powershell -ExecutionPolicy Bypass -File .\run_all.ps1
 | `validation_report.txt` | 驗證輸出 |
 | `run_config.json` | 實驗參數、種子、套件版本 |
 | `pilot/` | 試跑：`pilot_load_*`（OBSS 負載掃描與驗證）、`pilot_timing_*`、`chosen_loads.json`、`pilot_*_log.txt` |
+| `raw_improve.csv` | 改善實驗逐種子數據：8 變體 × 12 情境 × 30 種子 = 2880 列 |
+| `improve_summary.csv`、`improve_paired.csv` | 改善實驗的各變體彙總，以及相對 `fixed_th0` 與 `legacy` 的同種子成對差值 |
+| `raw_rate.csv` | 速率延伸逐種子數據：4 負載 × 6 情境 × 3 方法 × 30 種子 = 2160 列（5/30 Mbps 取自 `raw_per_seed.csv`） |
+| `rate_summary.csv`、`rate_paired.csv` | 速率延伸（5–30 Mbps）的彙總與成對差值 |
+| `rate_changepoints.csv` | 各 (P,S) 的變化點（Legacy 飽和、固定增益、延遲增益、自適應劣勢） |
+| `fig7_rate_sweep.png` | 速率延伸圖：Legacy 吞吐量、固定 − Legacy、自適應 − 固定 |
+
+---
+
+## 10. 改善嘗試與失敗分析（`run_experiment.py improve`、`analyze_extra.py`）
+
+第 7 節顯示自適應門檻在目標重載時變差。本節測試幾個可能的修正，並檢驗基準門檻本身是否合適。結果如實保留，多數修正無效。
+
+### 10.1 變體與設計
+
+| 變體 | 說明 |
+|---|---|
+| `legacy` | 永不切換 |
+| `fixed_th0` | 固定門檻 θ=0（本節的新比較基準） |
+| `fixed_th500` | 第 7 節的固定門檻基準 |
+| `adaptive_th500_k2000_w20` / `_w5` / `_w2` | 自適應，回看視窗 20 / 5 / 2 ms（4.4 節的 20 ms 改為可調） |
+| `queue_lo0_hi500_B20` | 佇列感知：目標 BSS 待傳封包 ≥ 20 個時 θ=0，否則 θ=500 µs |
+| `oracle_th0` | 診斷用近似 oracle：用前一趟副通道 OBSS 紀錄判斷整個交換放不放得下（含未來資訊，非可實作方法；見第 8 節） |
+
+- 8 變體 × 12 情境 × 30 種子 = 2880 次模擬；所有變體共用同一組到達序列與種子，故為成對比較。
+- 範圍：原計畫的「副通道閒置時間預測」未實作，改為回看視窗掃描。
+
+### 10.2 吞吐量差（相對 `fixed_th0`，Mbps）：目標重載六個情境
+
+`*` = 同種子成對差值的 95% CI 不含 0。
+
+| 情境 | fixed_th0 基準值 | legacy | fixed_th500 | adaptive w20 | adaptive w5 | adaptive w2 | queue | oracle |
+|---|---|---|---|---|---|---|---|---|
+| P-low, S-light | 30.05 | −0.39* | −0.00 | −0.00 | +0.00 | +0.01 | +0.00 | +0.00 |
+| P-mid, S-light | 27.30 | −5.46* | −0.52* | −0.82* | −0.80* | −0.77* | −0.00 | −0.08 |
+| P-high, S-light | 25.79 | −6.96* | −0.65* | −1.10* | −1.02* | −1.00* | +0.03 | −0.08 |
+| P-low, S-heavy | 30.05 | −0.39* | −0.01 | −0.00 | −0.03* | −0.04 | −0.01 | −0.02 |
+| P-mid, S-heavy | 25.01 | −3.18* | −0.30* | −1.02* | −1.01* | −0.94* | −0.09 | −0.71* |
+| P-high, S-heavy | 22.64 | −3.80* | −0.25* | −1.26* | −1.12* | −1.02* | +0.16 | −0.82* |
+
+目標輕載（5 Mbps）：所有變體吞吐量相同（差 ≤ 0.01 Mbps）；NPCA 類變體之間的延遲差 ≤ 0.09 ms；Legacy 的延遲高 0.05–0.52 ms（顯著）。
+
+### 10.3 延遲差（相對 `fixed_th0`，ms）：目標重載六個情境
+
+| 情境 | fixed_th0 基準值 | legacy | fixed_th500 | adaptive w20 | adaptive w5 | adaptive w2 | queue | oracle |
+|---|---|---|---|---|---|---|---|---|
+| P-low, S-light | 4.5 | +52.3* | +0.9* | +1.7* | +1.8* | +1.3* | +0.2 | +0.1 |
+| P-mid, S-light | 156.1 | +98.6* | +12.3* | +17.7* | +18.5* | +17.7* | −1.7 | +3.5 |
+| P-high, S-light | 190.4 | +114.2* | +12.8* | +21.0* | +18.8* | +19.0* | −2.0 | +0.7 |
+| P-low, S-heavy | 11.0 | +45.8* | +0.7 | +5.7* | +7.1* | +5.1* | −0.1 | +4.2* |
+| P-mid, S-heavy | 204.1 | +50.7* | +4.7* | +17.7* | +17.5* | +15.0* | +2.1 | +12.8* |
+| P-high, S-heavy | 243.6 | +61.0* | +3.3 | +19.5* | +17.2* | +15.3* | −2.0 | +12.2* |
+
+### 10.4 解讀
+
+1. **基準門檻比預期重要**：`fixed_th0` 優於 `fixed_th500`。P-mid 與 P-high 情境下，`fixed_th500` 的吞吐量低 0.25–0.65 Mbps、延遲高 3–13 ms（P-low 差異很小）。第 7 節的「固定門檻增益」是在次佳的 θ 上量到的；在本模型中門檻愈低愈好（與 7.6 一致）。
+2. **自適應：縮短回看視窗無法修正**：20 → 5 → 2 ms 使 P-high/S-heavy 的吞吐量損失由 −1.26 收斂到 −1.02 Mbps，仍全部低於 `fixed_th0`。這不是解法。
+3. **佇列感知等同基準**：重載（佇列常 ≥ 20）時 θ 幾乎都是 0，結果與 `fixed_th0` 無顯著差異（≤ 0.16 Mbps）。相對 `fixed_th500` 雖高 0.2–0.7 Mbps，但這是把門檻退回 0 造成的，屬於基準門檻調整，不是新機制。
+4. **oracle 減少切換，但吞吐量下降**：單種子診斷（P-mid、S-heavy、T-heavy、種子 1）中，`fixed_th0` 切換 2430 次、吞吐量 25.27 Mbps；oracle 切換 702 次、吞吐量 24.71 Mbps，窗口內拒絕 1658 次機會。P-mid 與 P-high 的 S-heavy 情境中，oracle 平均低 0.7–0.8 Mbps。過濾掉「放不下整個交換」的機會，會把有效機會一起丟掉。
+
+**結論**：沒有任何變體在統計上顯著優於 `fixed_th0`（吞吐量與延遲的顯著差異全為負或為零）。在本模型中，切換錯誤的成本低，而過濾機會的代價更高。改善方向是基準門檻（θ0 = 0），而非自適應過濾。
+
+### 10.5 與原始版本的對照
+
+原始版本指 git commit `6b57e2b`（修改前的第一次推送）。
+
+| 項目 | 原始版本（`6b57e2b`） | 本次修改後 |
+|---|---|---|
+| 主實驗輸出（`raw_per_seed.csv`、`summary_by_scenario.csv`、`paired_differences.csv`、`tables.md`、`raw_sensitivity.csv`、fig1–fig6） | 原始輸出 | 與 `6b57e2b` 相同（`git diff` 無變更） |
+| 預設門檻規則 | 固定 500 µs；自適應 θ0 = 500、k = 2000 | 相同；新參數（θ_hi、佇列門檻、oracle）預設關閉 |
+| 固定門檻基準 | θ = 500 µs | 保留為 `fixed_th500`，另以 `fixed_th0` 作為較佳基準 |
+| 提出的方法 | 自適應門檻：目標重載時吞吐量與延遲變差（7.4） | 結果相同；回看視窗、佇列感知、oracle 皆未優於 `fixed_th0`（10.2 至 10.4） |
+| 負載覆蓋 | 5 / 30 Mbps | 增加 10、15、20、25 Mbps（第 11 節） |
+| 驗證 | `validate.py` test1–test5 | 新增 test6（佇列門檻與 oracle 單元檢查）；29 項 PASS、0 項 FAIL |
+
+原始結果的數字與敘述（第 7 節）未改動。修改後的新結論只出現在第 10、11 節；第 7.6 與 10.4 已指出 θ0 = 500 µs 並非最佳固定門檻。
+
+---
+
+## 11. 速率延伸與變化點（`run_experiment.py rate`、`analyze_extra.py`）
+
+### 11.1 設計
+
+- 目標 BSS 聚合負載：10、15、20、25 Mbps，加上主實驗的 5、30 Mbps，共 6 點（間距 5 Mbps）。
+- 方法：`legacy`、`fixed_th500`、`adaptive_th500_k2000`（與主實驗相同設定）。
+- 情境：P（low/mid/high）× S（light/heavy）共 6 組，每組 30 種子。新執行 2160 次（4 負載 × 6 情境 × 3 方法 × 30 種子）；5/30 Mbps 取自主實驗。
+- 未重新試跑：OBSS 到達率沿用 5/30 Mbps 試跑校準的 P/S 設定。
+- 變化點定義（第一個符合條件的掃描點，見第 8 節）：
+  - **Legacy 飽和**：Legacy 吞吐量 ÷ 提供量 < 0.95。
+  - **固定增益點**：固定 − Legacy 的吞吐量差 > 0 且 95% CI 不含 0（延遲版本：延遲差 < 0 且 CI 不含 0）。
+  - **自適應劣勢點**：自適應 − 固定的吞吐量差 < 0 且 95% CI 不含 0。
+
+### 11.2 吞吐量（Mbps，平均）：Legacy / 固定 / 自適應
+
+| P, S | 10 | 15 | 20 | 25 | 30 |
+|---|---|---|---|---|---|
+| low, light | 10.01 ×3 | 15.04 ×3 | 20.05 ×3 | 25.05 ×3 | 29.66 / 30.05 / 30.05 |
+| low, heavy | 10.01 ×3 | 15.04 ×3 | 20.05 ×3 | 25.05 ×3 | 29.66 / 30.04 / 30.04 |
+| mid, light | 10.01 ×3 | 15.04 ×3 | 20.05 ×3 | 21.82 / 25.05 / 25.06 | 21.83 / 26.78 / 26.48 |
+| mid, heavy | 10.01 ×3 | 15.04 ×3 | 20.05 ×3 | 21.82 / 24.77 / 23.95 | 21.83 / 24.72 / 23.99 |
+| high, light | 10.01 ×3 | 15.04 ×3 | 18.46 / 20.05 / 20.05 | 18.73 / 24.71 / 24.53 | 18.83 / 25.14 / 24.69 |
+| high, heavy | 10.01 ×3 | 15.04 ×3 | 18.46 / 20.04 / 19.95 | 18.73 / 22.36 / 21.40 | 18.83 / 22.39 / 21.38 |
+
+5 Mbps 的數值見 `results/rate_summary.csv`（三方法皆約 4.99 Mbps）。
+
+### 11.3 變化點
+
+| P | S | Legacy 飽和 | 固定增益（吞吐量） | 延遲增益 | 自適應劣勢（吞吐量） |
+|---|---|---|---|---|---|
+| low | light | 無（30 Mbps 時 0.99） | 30 Mbps | 5 Mbps | 無 |
+| low | heavy | 無（30 Mbps 時 0.99） | 30 Mbps | 5 Mbps | 無 |
+| mid | light | 25 Mbps | 25 Mbps | 5 Mbps | 30 Mbps |
+| mid | heavy | 25 Mbps | 25 Mbps | 5 Mbps | 25 Mbps |
+| high | light | 20 Mbps | 20 Mbps | 5 Mbps | 25 Mbps |
+| high | heavy | 20 Mbps | 20 Mbps | 5 Mbps | 20 Mbps |
+
+「延遲增益 5 Mbps」表示從 5 Mbps 起固定門檻的延遲已低於 Legacy（約 0.50 → 0.45 ms，見第 7.2 節），是輕載效果，不是負載變化點。
+
+### 11.4 OBSS_P 實測忙碌比例（Legacy，與 S 無關）
+
+| P | 5 | 10 | 15 | 20 | 25 | 30 |
+|---|---|---|---|---|---|---|
+| low | 0.104 | 0.106 | 0.109 | 0.115 | 0.123 | 0.146 |
+| mid | 0.263 | 0.272 | 0.289 | 0.326 | 0.364 | 0.364 |
+| high | 0.419 | 0.446 | 0.510 | 0.458 | 0.451 | 0.447 |
+
+忙碌比例不隨目標負載單調上升：目標 BSS 負載愈大，OBSS_P 愈難取得通道（P-high 在 15 Mbps 後下降）。因此 OBSS 忙碌比例是實測結果，不是固定輸入。
+
+### 11.5 解讀
+
+- **10 與 15 Mbps**：三種方法吞吐量完全相同，沒有變化點。
+- **變化點與 Legacy 飽和同時出現**：P-mid 在 25 Mbps、P-high 在 20 Mbps，Legacy 送達比低於 95%，同一點 NPCA 開始有顯著增益。P-low 要到 30 Mbps（Legacy 送達 98.9%）才出現小幅增益（+0.39 Mbps）。
+- **自適應劣勢與增益同時或稍晚出現**：低於該點兩者無差；超過後自適應開始低於固定。P-high/S-heavy 在 20 Mbps 為 −0.09 Mbps（顯著但很小），25 Mbps 擴大到 −0.96 Mbps。
+- **延遲**：5 Mbps 起固定門檻的延遲已低於 Legacy，屬於輕載效果（第 7.2 節）。
+- **結論**：NPCA 的吞吐量效益只出現在 Legacy 開始飽和的負載區，自適應的劣勢也集中在此區。這與第 7.4 節的 5/30 Mbps 結論一致，並把變化點定位在 20–25 Mbps（P-mid/P-high）。
+
+![速率延伸與變化點](results/fig7_rate_sweep.png)
+
+### 11.6 適用條件與無優勢情況
+
+依第 7、10、11 節的結果整理（本模型的參數範圍，見第 8 節）：
+
+| 條件 | 結論 | 依據 |
+|---|---|---|
+| 目標 BSS 負載低於 Legacy 飽和點（送達比 ≥ 0.95：P-high 約 15 Mbps 以下、P-mid 約 20 Mbps 以下、P-low 在 30 Mbps 以下皆不飽和） | 無吞吐量增益；延遲增益很小（約 0.05 ms 量級，輕載） | 11.2、11.3 |
+| 主通道 OBSS 很輕（P-low）且目標負載 ≤ 25 Mbps | 幾乎沒有 NPCA 增益 | P-low 只在 30 Mbps 出現 +0.39 Mbps（11.3） |
+| 主通道 OBSS 中等以上（P-mid、P-high）且目標飽和（20 至 25 Mbps 起） | 固定門檻 NPCA 有增益（約 +1 至 +6 Mbps），延遲顯著下降 | 11.3、7.2 |
+| 副通道 OBSS 重載（S-heavy） | 固定門檻增益縮小；自適應劣勢最大 | 7.4、7.6 |
+| 自適應門檻（本作業測試的所有 k > 0 與 θ0 設定） | 不建議；重載時吞吐量與延遲變差，僅減輕對 OBSS_S 的延遲影響 | 7.4、7.6、10.2 至 10.4 |
+| 過濾可用機會（oracle、較長 k、較高 θ） | 吞吐量下降，因有效機會也被過濾 | 7.6、10.4 |
+| θ0 ≥ 2000 µs | 固定門檻的增益縮水（P-high/S-light 僅 +3.1 Mbps） | 7.6 |
+
+結論：NPCA 的吞吐量效益只出現在主通道 OBSS 有一定忙碌、且目標 BSS 接近或超過 Legacy 容量時；在輕載、主通道 OBSS 很輕，或以自適應方式過濾機會時，都看不到優勢。
 

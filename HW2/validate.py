@@ -236,10 +236,44 @@ def test5():
     check(own_vs_all_gap > 0.02, f"對照：若把目標 BSS 在副通道的傳輸也算進去，忙碌比例最多會差 {own_vs_all_gap:.3f}，故確實已排除")
 
 
+def test6():
+    say("[6] 改善變體：佇列門檻的 θ_hi = θ_0 時與固定門檻一致、無未來資訊；oracle 可行性判斷正確")
+    ok = True
+    n_sw = 0
+    for seed in (1, 2, 3):
+        for target in (6.0, 30.0):
+            sf = build(seed, "fixed", 400.0, 500.0, target, t_meas_s=1.0, trace=True, theta0_ns=500 * US)
+            sq = build(seed, "queue", 400.0, 500.0, target, t_meas_s=1.0, trace=True, theta0_ns=500 * US, theta_hi_ns=500 * US)
+            rf, rq = sf.run(), sq.run()
+            ok &= sig(rf) == sig(rq) and trace_sig(sf) == trace_sig(sq)
+            n_sw += rf["n_switch"]
+    check(ok and n_sw > 50, f"6a 6 組 (seed x 目標負載)：queue 的 θ_hi = θ_0 時與固定門檻結果與事件序列逐項相同 (共 {n_sw} 次切換)")
+    t_cut = 600 * 1_000_000
+    cfg_kw = dict(method="queue", theta0_ns=0, theta_hi_ns=500 * US, t_meas_ns=1_000_000_000, n_sta=5, trace=True)
+
+    def arrivals():
+        return [list(x) for x in make_arrivals(7, 5, sta_rate_pps(30.0, 5), 400.0, 600.0, 1_010_000_000)]
+    arr_b = arrivals()
+    k = sum(1 for t in arr_b[6][0] if t <= t_cut)
+    arr_b[6] = (arr_b[6][0][:k], arr_b[6][1][:k])  # 刪除 t_cut 之後的副通道 OBSS 到達
+    sa = Simulator(SimConfig(**cfg_kw), arrivals(), make_backoff_rngs(7, 5))
+    sb = Simulator(SimConfig(**cfg_kw), arr_b, make_backoff_rngs(7, 5))
+    sa.run()
+    sb.run()
+    ea = [e for e in sa.log if e[0] <= t_cut]
+    eb = [e for e in sb.log if e[0] <= t_cut]
+    check(ea == eb and len(ea) > 1000, f"6b queue：改變 t = 0.6 s 之後的副通道到達，t <= 0.6 s 的 {len(ea)} 個事件完全不變")
+    # oracle 可行性：副通道 OBSS 傳輸 (100,200) 與 (300,400) us，判斷 [t+DIFS, win_end] 能否容納 need
+    o = build(1, "oracle", 0.0, 0.0, 30.0, t_meas_s=1.0, oracle_s_busy=((100 * US, 200 * US), (300 * US, 400 * US)))
+    cases = [(0, 1000, 50, True), (0, 1000, 80, True), (0, 600, 500, False), (0, 120, 50, True), (0, 80, 50, False)]
+    got = [o._oracle_feasible(t * US, w * US, n * US) for t, w, n, _ in cases]
+    check(got == [c[3] for c in cases], "6c oracle 可行性判斷在 5 個人工案例上正確 (含窗口尾端不足、間隙容納、跨越忙碌區間)")
+
+
 def main():
     say("NPCA 模擬器驗證報告")
     say("=" * 60)
-    for t in (test1, test2, test3, test4, test5):
+    for t in (test1, test2, test3, test4, test5, test6):
         t()
         say()
     say("=" * 60)

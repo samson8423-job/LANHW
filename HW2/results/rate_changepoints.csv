@@ -1,0 +1,7 @@
+p_level,s_level,legacy_saturation_mbps,first_sig_tput_gain_mbps,first_sig_delay_gain_mbps,first_sig_adaptive_penalty_mbps
+low,light,nan,30,5,nan
+low,heavy,nan,30,5,nan
+mid,light,25,25,5,30
+mid,heavy,25,25,5,25
+high,light,20,20,5,25
+high,heavy,20,20,5,20
