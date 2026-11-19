@@ -1,0 +1,76 @@
+{
+  "hypothetical_parameter": "recovery_us 為假設性敏感度參數，非 IEEE 802.11bn 規定或實測硬體數值",
+  "p_level": "high",
+  "s_levels": [
+    "light",
+    "heavy"
+  ],
+  "t_level": "heavy",
+  "target_mbps": 30.0,
+  "recovery_us": [
+    0,
+    100,
+    300
+  ],
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "t_warm_s": 3.0,
+  "t_meas_s": 10.0,
+  "variants": [
+    {
+      "variant": "fixed_th0",
+      "method": "fixed",
+      "theta0_us": 0,
+      "k_us": 2000,
+      "busy_window_ms": 20
+    },
+    {
+      "variant": "fixed_th500",
+      "method": "fixed",
+      "theta0_us": 500,
+      "k_us": 2000,
+      "busy_window_ms": 20
+    },
+    {
+      "variant": "adaptive_th500_k2000_w20",
+      "method": "adaptive",
+      "theta0_us": 500,
+      "k_us": 2000,
+      "busy_window_ms": 20
+    }
+  ],
+  "python": "3.11.4",
+  "numpy": "2.4.6",
+  "matplotlib": "3.11.2",
+  "platform": "Windows-10-10.0.18363-SP0"
+}

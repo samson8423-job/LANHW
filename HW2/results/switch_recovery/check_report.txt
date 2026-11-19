@@ -1,0 +1,17 @@
+切回恢復時間短測 (種子 1，P-high，T-heavy，S-light/heavy)
+[A] recovery = 0 µs 與既有結果逐項比對
+    [PASS] recovery=0 的 6 筆結果，與既有結果 10 組比對，12 個欄位相對誤差 <= 1e-6
+[B] recovery > 0 的事件紀錄檢查 (量測 5 s)
+    [PASS] S-light fixed_th0 R=100 us：切回 1966 次，切回後目標 BSS 主通道起送 10021 次，最小間隔 134.0 us (需 >= 134 us)，違規 0 次；恢復期內 OBSS_P 起送 685 次
+    [PASS] S-light fixed_th0 R=300 us：切回 1944 次，切回後目標 BSS 主通道起送 10231 次，最小間隔 334.0 us (需 >= 334 us)，違規 0 次；恢復期內 OBSS_P 起送 1409 次
+    [PASS] S-light fixed_th500 R=100 us：切回 834 次，切回後目標 BSS 主通道起送 10252 次，最小間隔 134.0 us (需 >= 134 us)，違規 0 次；恢復期內 OBSS_P 起送 402 次
+    [PASS] S-light fixed_th500 R=300 us：切回 862 次，切回後目標 BSS 主通道起送 10282 次，最小間隔 334.0 us (需 >= 334 us)，違規 0 次；恢復期內 OBSS_P 起送 811 次
+    [PASS] S-light adaptive_th500_k2000_w20 R=100 us：切回 696 次，切回後目標 BSS 主通道起送 10327 次，最小間隔 134.0 us (需 >= 134 us)，違規 0 次；恢復期內 OBSS_P 起送 333 次
+    [PASS] S-light adaptive_th500_k2000_w20 R=300 us：切回 701 次，切回後目標 BSS 主通道起送 10077 次，最小間隔 334.0 us (需 >= 334 us)，違規 0 次；恢復期內 OBSS_P 起送 680 次
+    [PASS] S-heavy fixed_th0 R=100 us：切回 1966 次，切回後目標 BSS 主通道起送 10184 次，最小間隔 134.0 us (需 >= 134 us)，違規 0 次；恢復期內 OBSS_P 起送 699 次
+    [PASS] S-heavy fixed_th0 R=300 us：切回 1967 次，切回後目標 BSS 主通道起送 9954 次，最小間隔 334.0 us (需 >= 334 us)，違規 0 次；恢復期內 OBSS_P 起送 1400 次
+    [PASS] S-heavy fixed_th500 R=100 us：切回 833 次，切回後目標 BSS 主通道起送 10586 次，最小間隔 134.0 us (需 >= 134 us)，違規 0 次；恢復期內 OBSS_P 起送 430 次
+    [PASS] S-heavy fixed_th500 R=300 us：切回 880 次，切回後目標 BSS 主通道起送 10033 次，最小間隔 334.0 us (需 >= 334 us)，違規 0 次；恢復期內 OBSS_P 起送 812 次
+    [PASS] S-heavy adaptive_th500_k2000_w20 R=100 us：切回 297 次，切回後目標 BSS 主通道起送 10641 次，最小間隔 134.0 us (需 >= 134 us)，違規 0 次；恢復期內 OBSS_P 起送 130 次
+    [PASS] S-heavy adaptive_th500_k2000_w20 R=300 us：切回 298 次，切回後目標 BSS 主通道起送 10586 次，最小間隔 343.0 us (需 >= 334 us)，違規 0 次；恢復期內 OBSS_P 起送 298 次
+結論：全部通過

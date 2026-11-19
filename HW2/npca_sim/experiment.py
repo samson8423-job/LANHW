@@ -25,6 +25,7 @@ def run_one(job):
         t_meas_ns=t_meas,
         n_sta=N_STA,
         block_ns=int(job.get("block_s", 0) * 1e9),
+        recovery_ns=int(job.get("recovery_us", 0) * US),
     )
     arr = make_arrivals(
         job["seed"], N_STA, sta_rate_pps(job["target_mbps"], N_STA),

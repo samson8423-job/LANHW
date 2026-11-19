@@ -40,6 +40,7 @@ class SimConfig:
     trace_limit: int = 100_000
     track_ids: bool = False
     block_ns: int = 0                 # >0 時另外輸出每個時間區塊的目標 BSS 送達統計 (試跑用)
+    recovery_ns: int = 0              # 假設性敏感度參數：切回主通道後目標 BSS 的恢復時間 (非 IEEE 規定或實測值)
 
 
 class Node:
@@ -125,6 +126,7 @@ class Simulator:
         self.oracle_iv = cfg.oracle_s_busy
         self.oracle_en = [b for _, b in cfg.oracle_s_busy]
         self.n_rej_oracle = self.n_sw_s_busy0 = self.n_rej_theta_s_idle = 0
+        self.tgt_hold = 0  # 目標 BSS 最早可開始倒數的時刻 (切回後 + recovery_ns)
 
     # ---------------------------------------------------------------- 工具
     def _trace(self, t, ev, node, ch, info=""):
@@ -208,6 +210,8 @@ class Simulator:
                 ready = t
                 if nd.is_target and c == 1:
                     ready = max(t, self.session["sense_ready"])
+                elif nd.is_target:
+                    ready = max(t, self.tgt_hold + DIFS)
                 nd.count_start = self._align(c, ready)
                 nd.active = True
         else:
@@ -311,7 +315,7 @@ class Simulator:
         for nd in self.nodes:
             if nd.ch == c and not nd.in_tx and nd.queue:
                 nd.active = True
-                nd.count_start = t + DIFS
+                nd.count_start = (max(t, self.tgt_hold) if nd.is_target else t) + DIFS
 
     def _decide(self, t, t_end_est):
         win = self._in_win(t)
@@ -353,7 +357,7 @@ class Simulator:
             self.n_sw_s_busy0 += self.busy_until[1] > t
         self.session = {
             "t_start": t, "t_end": t_end_est, "win_end": t_end_est - T_BACK,
-            "sense_ready": t + DIFS, "deliv": 0, "tx": 0, "coll": 0,
+            "sense_ready": max(t, self.tgt_hold) + DIFS, "deliv": 0, "tx": 0, "coll": 0,
             "theta": theta, "ratio": ratio, "remaining": remaining,
         }
         self.tracing and self._trace(t, "NPCA_SWITCH_OUT", "TARGET", 1,
@@ -362,7 +366,7 @@ class Simulator:
             nd.ch = 1
             nd.active = False
             if nd.queue and not nd.in_tx and self.busy_until[1] <= t:
-                nd.count_start = self._align(1, t + DIFS)
+                nd.count_start = self._align(1, max(t, self.tgt_hold) + DIFS)
                 nd.active = True
             self.tracing and self._trace(t, "RESUME_BACKOFF_ON_S" if nd.queue else "IDLE_ON_S", nd.name, 1,
                         f"b={nd.b}" if nd.queue else "")
@@ -370,6 +374,9 @@ class Simulator:
     def _end_session(self, t):
         s = self.session
         t_cut = t - T_BACK
+        self.tgt_hold = t + self.cfg.recovery_ns
+        if self.cfg.recovery_ns:
+            self.tracing and self._trace(t, "RECOVERY_START", "TARGET", 0, f"until_us={self.tgt_hold / US:.1f}")
         for nd in self.targets:
             assert not nd.in_tx, "切回時仍有傳輸進行"
             if nd.active:
